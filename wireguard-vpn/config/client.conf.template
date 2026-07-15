@@ -1,0 +1,89 @@
+# =============================================================================
+# WireGuard Client Configuration Template
+# =============================================================================
+# This template is used by add-client.sh to generate per-client config files.
+# Variables in {{DOUBLE_BRACES}} are substituted at client creation time.
+#
+# Distribute this file SECURELY to each client.
+# This is the ONLY config file the client needs.
+# It contains the client's private key — treat it like a password.
+# =============================================================================
+
+[Interface]
+# ─────────────────────────────────────────────────────
+# The CLIENT's private key. Generated on the SERVER for convenience.
+# In high-security environments, the client generates their own key
+# and only sends the PUBLIC key to the server admin.
+# ─────────────────────────────────────────────────────
+PrivateKey = {{CLIENT_PRIVATE_KEY}}
+
+# The client's IP address inside the VPN tunnel.
+# /32 means "just this single IP" (not a subnet).
+Address = {{CLIENT_IP}}/32
+
+# IPv6 address for the client inside the tunnel
+Address = {{CLIENT_IP6}}/128
+
+# DNS servers to use while connected to the VPN.
+# 1.1.1.1 = Cloudflare (fast, private)
+# 8.8.8.8 = Google (reliable fallback)
+# Using VPN DNS prevents DNS leaks (your ISP cannot see your queries).
+DNS = {{WG_DNS}}
+
+# MTU must match the server value to avoid fragmentation
+MTU = {{WG_MTU}}
+
+# ─────────────────────────────────────────────────────
+# KILL SWITCH
+# These two rules ensure that if the VPN drops, ALL internet traffic
+# is blocked. This prevents accidental cleartext traffic exposure.
+#
+# PreUp: Before bringing the interface up, block all outbound traffic
+#        EXCEPT traffic going through the WireGuard interface (wg0).
+#        We use a routing table trick: fwmark + ip rule.
+#
+# PostDown: When VPN goes down, REMOVE kill switch rules so you can
+#           browse the web again (without VPN).
+# ─────────────────────────────────────────────────────
+PostUp = iptables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT
+PostDown = iptables -D OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -m addrtype ! --dst-type LOCAL -j REJECT
+
+[Peer]
+# ─────────────────────────────────────────────────────
+# The SERVER's public key.
+# Generated from the server private key with: wg pubkey < private.key
+# ─────────────────────────────────────────────────────
+PublicKey = {{SERVER_PUBLIC_KEY}}
+
+# ─────────────────────────────────────────────────────
+# PresharedKey: An optional additional layer of symmetric encryption.
+# Provides resistance against future quantum computing attacks.
+# Both client and server must have the SAME preshared key.
+# Generated with: wg genpsk
+# ─────────────────────────────────────────────────────
+PresharedKey = {{PRESHARED_KEY}}
+
+# ─────────────────────────────────────────────────────
+# Endpoint: The server's public IP address (or domain name) and port.
+# This is how the client finds the server on the internet.
+# Format: ip:port  or  hostname:port
+# ─────────────────────────────────────────────────────
+Endpoint = {{SERVER_ENDPOINT}}:{{WG_PORT}}
+
+# ─────────────────────────────────────────────────────
+# AllowedIPs: Which IPs are routed through the VPN tunnel.
+# 0.0.0.0/0 = ALL IPv4 traffic goes through VPN (full tunnel)
+# ::/0      = ALL IPv6 traffic goes through VPN
+#
+# For split tunnel (only VPN subnet), use:
+# AllowedIPs = 10.100.0.0/24
+# ─────────────────────────────────────────────────────
+AllowedIPs = 0.0.0.0/0, ::/0
+
+# ─────────────────────────────────────────────────────
+# PersistentKeepalive: Send a keepalive packet every 25 seconds.
+# This is REQUIRED when the client is behind NAT (home router, etc.)
+# Without it, the NAT table entry expires and the connection drops.
+# Set to 0 to disable (not recommended for mobile clients).
+# ─────────────────────────────────────────────────────
+PersistentKeepalive = {{WG_KEEPALIVE}}

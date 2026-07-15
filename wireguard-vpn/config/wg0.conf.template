@@ -1,0 +1,77 @@
+# =============================================================================
+# WireGuard Server Configuration Template
+# =============================================================================
+# This template is used by install.sh to generate /etc/wireguard/wg0.conf
+# Variables in {{DOUBLE_BRACES}} are substituted at install time.
+#
+# SECURITY NOTE: This file contains the server private key.
+#   Permissions MUST be 600 (chmod 600 /etc/wireguard/wg0.conf)
+#   Only root should be able to read this file.
+# =============================================================================
+
+[Interface]
+# ─────────────────────────────────────────────────────
+# The server's PRIVATE key. Generated with: wg genkey
+# NEVER share this with anyone. NEVER commit to git.
+# ─────────────────────────────────────────────────────
+PrivateKey = {{SERVER_PRIVATE_KEY}}
+
+# The IP address of this server inside the VPN tunnel.
+# Clients will use this as the gateway.
+Address = {{WG_SERVER_IP}}/24
+
+# Also assign an IPv6 address inside the tunnel
+Address = fd00:100::1/64
+
+# UDP port WireGuard listens on. Must be open in your firewall.
+ListenPort = {{WG_PORT}}
+
+# ─────────────────────────────────────────────────────
+# MTU (Maximum Transmission Unit)
+# 1420 is optimal for most connections. Lower values reduce
+# fragmentation at the cost of slightly more overhead.
+# Common values: 1280 (conservative), 1420 (recommended), 1500 (LAN only)
+# ─────────────────────────────────────────────────────
+MTU = {{WG_MTU}}
+
+# ─────────────────────────────────────────────────────
+# PostUp: Commands run AFTER the WireGuard interface comes up.
+# These rules enable NAT (Network Address Translation) so that
+# VPN clients can reach the internet through the server's IP.
+#
+# iptables -t nat -A POSTROUTING: Adds a NAT rule in the POSTROUTING chain
+# -s {{WG_SUBNET}}: Match traffic from the VPN subnet
+# -o {{SERVER_IFACE}}: Going OUT through the server's real network interface
+# -j MASQUERADE: Rewrite the source IP to the server's public IP
+#
+# IPv6 rules mirror the IPv4 rules using ip6tables.
+# ─────────────────────────────────────────────────────
+PostUp = iptables -t nat -A POSTROUTING -s {{WG_SUBNET}} -o {{SERVER_IFACE}} -j MASQUERADE
+PostUp = iptables -A FORWARD -i %i -j ACCEPT
+PostUp = iptables -A FORWARD -o %i -j ACCEPT
+PostUp = ip6tables -t nat -A POSTROUTING -s fd00:100::/64 -o {{SERVER_IFACE}} -j MASQUERADE
+PostUp = ip6tables -A FORWARD -i %i -j ACCEPT
+PostUp = ip6tables -A FORWARD -o %i -j ACCEPT
+
+# ─────────────────────────────────────────────────────
+# PostDown: Commands run AFTER the interface is brought down.
+# These REMOVE the NAT and forwarding rules we added above.
+# Always mirror PostUp rules here, just replace -A with -D (delete).
+# ─────────────────────────────────────────────────────
+PostDown = iptables -t nat -D POSTROUTING -s {{WG_SUBNET}} -o {{SERVER_IFACE}} -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT
+PostDown = iptables -D FORWARD -o %i -j ACCEPT
+PostDown = ip6tables -t nat -D POSTROUTING -s fd00:100::/64 -o {{SERVER_IFACE}} -j MASQUERADE
+PostDown = ip6tables -D FORWARD -i %i -j ACCEPT
+PostDown = ip6tables -D FORWARD -o %i -j ACCEPT
+
+# ─────────────────────────────────────────────────────
+# [Peer] sections are appended automatically by add-client.sh
+# Each client gets a block like:
+#
+# [Peer]
+# # Name: alice
+# PublicKey  = <client public key>
+# PresharedKey = <optional extra symmetric key for PQC resistance>
+# AllowedIPs = 10.100.0.2/32, fd00:100::2/128
+# ─────────────────────────────────────────────────────

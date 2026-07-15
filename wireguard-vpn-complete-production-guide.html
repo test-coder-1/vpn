@@ -1,0 +1,434 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WireGuard VPN — Production Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.65; color: #1f2328; background: #fff; }
+  .page { max-width: 760px; margin: 0 auto; padding: 32px 20px 60px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #1f2328; }
+  h2 { font-size: 16px; font-weight: 700; margin: 32px 0 10px; color: #1f2328; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+  h3 { font-size: 14px; font-weight: 700; margin: 18px 0 6px; color: #1f2328; }
+  p  { margin: 8px 0; color: #1f2328; }
+  .subtitle { color: #57606a; margin-bottom: 28px; font-size: 13px; }
+  code { font-family: "Consolas", "Menlo", monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px 5px; color: #1f2328; }
+  pre  { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 10px 0; }
+  pre code { background: none; border: none; padding: 0; font-size: 12px; color: #1f2328; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; margin: 2px; }
+  .badge-blue   { background: #dbeafe; color: #1e40af; }
+  .badge-green  { background: #dcfce7; color: #166534; }
+  .badge-purple { background: #ede9fe; color: #5b21b6; }
+  .badge-amber  { background: #fef3c7; color: #92400e; }
+  .badge-red    { background: #fee2e2; color: #991b1b; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #f7f8fa; border: 1px solid #e5e7eb; padding: 7px 10px; text-align: left; font-weight: 600; color: #57606a; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  td { border: 1px solid #e5e7eb; padding: 7px 10px; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .card { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 18px; margin: 12px 0; }
+  .card-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+  .step { display: flex; gap: 12px; margin: 10px 0; }
+  .step-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: #3b82d4; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .step-body { flex: 1; }
+  .warn { background: #fffbeb; border-left: 3px solid #f59e0b; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13px; }
+  .info { background: #eff6ff; border-left: 3px solid #3b82d4; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13px; }
+  .ok   { background: #f0fdf4; border-left: 3px solid #22c55e; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .tag-row { margin: 6px 0; }
+  .file-tree { font-family: "Consolas", "Menlo", monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; line-height: 1.8; }
+  .tree-dir   { color: #3b82d4; font-weight: 700; }
+  .tree-file  { color: #1f2328; }
+  .tree-note  { color: #57606a; font-style: italic; }
+  .crypto-box { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; margin: 12px 0; }
+  .crypto-hdr { background: #3b82d4; color: #fff; padding: 7px 12px; font-size: 12px; font-weight: 700; }
+  .crypto-body { padding: 10px 14px; font-size: 13px; }
+  .flow { display: flex; align-items: center; gap: 0; margin: 14px 0; flex-wrap: wrap; }
+  .flow-box { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 12px; font-size: 12px; text-align: center; font-weight: 600; min-width: 90px; }
+  .flow-arr { color: #57606a; font-size: 18px; padding: 0 4px; }
+  .platform-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0; }
+  .platform-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 8px; text-align: center; background: #fafafa; }
+  .platform-icon { font-size: 22px; display: block; margin-bottom: 4px; }
+  .platform-name { font-size: 11px; font-weight: 700; color: #1f2328; }
+  .platform-cmd  { font-size: 10px; color: #57606a; margin-top: 3px; }
+  .deploy-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
+  .deploy-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fafafa; }
+  .deploy-card .name { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .deploy-card .cost { font-size: 11px; color: #57606a; }
+  .deploy-card .specs { font-size: 11px; margin-top: 4px; color: #1f2328; }
+  .sec-check { display: flex; gap: 8px; margin: 6px 0; font-size: 13px; }
+  .sec-icon { color: #22c55e; font-weight: 700; }
+  @media (max-width: 500px) {
+    .grid2, .grid3, .platform-grid, .deploy-grid { grid-template-columns: 1fr; }
+  }
+  footer { border-top: 1px solid #e5e7eb; margin-top: 48px; padding-top: 12px; text-align: center; color: #57606a; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  
+  <h1>🔒 WireGuard VPN — Production Reference</h1>
+  <p class="subtitle">Self-hosted • Ubuntu 24.04 LTS • IPv4 + IPv6 • Multi-client • Full tunnel + Kill switch</p>
+
+  <div class="tag-row">
+    <span class="badge badge-blue">WireGuard</span>
+    <span class="badge badge-green">Ubuntu 24.04</span>
+    <span class="badge badge-purple">ChaCha20-Poly1305</span>
+    <span class="badge badge-amber">Curve25519</span>
+    <span class="badge badge-blue">UFW</span>
+    <span class="badge badge-green">Fail2Ban</span>
+    <span class="badge badge-purple">IPv6</span>
+    <span class="badge badge-amber">Kill Switch</span>
+  </div>
+
+  
+  <h2>Network Layout</h2>
+  <table>
+    <tr><th>Role</th><th>IP Address</th><th>Description</th></tr>
+    <tr><td><code>Server</code></td><td><code>10.100.0.1/24</code></td><td>WireGuard tunnel endpoint, NAT gateway</td></tr>
+    <tr><td><code>Client 1</code></td><td><code>10.100.0.2/32</code></td><td>First peer (e.g. alice)</td></tr>
+    <tr><td><code>Client 2</code></td><td><code>10.100.0.3/32</code></td><td>Second peer (e.g. bob)</td></tr>
+    <tr><td><code>Client N</code></td><td><code>10.100.0.N/32</code></td><td>Up to 253 clients per /24</td></tr>
+  </table>
+  <table>
+    <tr><th>Parameter</th><th>Value</th><th>Why</th></tr>
+    <tr><td>Subnet</td><td><code>10.100.0.0/24</code></td><td>Private RFC 1918 range</td></tr>
+    <tr><td>Port</td><td><code>51820/UDP</code></td><td>WireGuard default</td></tr>
+    <tr><td>DNS</td><td><code>1.1.1.1, 8.8.8.8</code></td><td>Cloudflare + Google (DNS leak prevention)</td></tr>
+    <tr><td>MTU</td><td><code>1420</code></td><td>1500 − 80 bytes WG overhead</td></tr>
+    <tr><td>Keepalive</td><td><code>25s</code></td><td>Prevents NAT table expiry</td></tr>
+  </table>
+
+  
+  <h2>Project Structure (21 files)</h2>
+  <div class="file-tree">
+<span class="tree-dir">wireguard-vpn/</span><br />
+├── <span class="tree-file">install.sh</span>           <span class="tree-note">← Full installer (332 lines)</span><br />
+├── <span class="tree-file">uninstall.sh</span>         <span class="tree-note">← Clean removal with optional backup</span><br />
+├── <span class="tree-file">README.md</span>            <span class="tree-note">← Quick-start and overview</span><br />
+├── <span class="tree-dir">scripts/</span><br />
+│   ├── <span class="tree-file">add-client.sh</span>    <span class="tree-note">← Generate keys, config, QR, hot-add peer</span><br />
+│   ├── <span class="tree-file">remove-client.sh</span> <span class="tree-note">← Hot-remove, shred keys, clean registry</span><br />
+│   ├── <span class="tree-file">list-clients.sh</span>  <span class="tree-note">← Live status, handshake time, RX/TX</span><br />
+│   ├── <span class="tree-file">revoke-client.sh</span> <span class="tree-note">← Block without deleting (audit trail)</span><br />
+│   ├── <span class="tree-file">show-qr.sh</span>       <span class="tree-note">← UTF-8 QR in terminal + PNG file</span><br />
+│   ├── <span class="tree-file">backup.sh</span>        <span class="tree-note">← tar.gz + sha256 + optional AES-256 encrypt</span><br />
+│   ├── <span class="tree-file">restore.sh</span>       <span class="tree-note">← Verify checksum and restore</span><br />
+│   ├── <span class="tree-file">monitor.sh</span>       <span class="tree-note">← Live dashboard (5s refresh)</span><br />
+│   └── <span class="tree-file">update-wg.sh</span>     <span class="tree-note">← apt upgrade + restart + verify</span><br />
+├── <span class="tree-dir">config/</span><br />
+│   ├── <span class="tree-file">wg0.conf.template</span>    <span class="tree-note">← Server config template (commented)</span><br />
+│   ├── <span class="tree-file">client.conf.template</span> <span class="tree-note">← Client config template (commented)</span><br />
+│   └── <span class="tree-file">server.env</span>           <span class="tree-note">← Shared variables for all scripts</span><br />
+├── <span class="tree-dir">systemd/</span><br />
+│   └── <span class="tree-file">override.conf</span>    <span class="tree-note">← Auto-restart, boot ordering, limits</span><br />
+├── <span class="tree-dir">fail2ban/</span><br />
+│   └── <span class="tree-file">jail.local</span>       <span class="tree-note">← SSH + recidive protection</span><br />
+└── <span class="tree-dir">docs/</span><br />
+    ├── <span class="tree-file">HOW-WIREGUARD-WORKS.md</span><br />
+    ├── <span class="tree-file">CLIENT-SETUP.md</span><br />
+    ├── <span class="tree-file">DEPLOYMENT.md</span><br />
+    └── <span class="tree-file">TROUBLESHOOTING.md</span>
+  </div>
+
+  
+  <h2>Quick Start</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Copy project to your Ubuntu 24.04 server</strong><br /><code>git clone … &amp;&amp; cd wireguard-vpn</code></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Make scripts executable</strong><br /><code>chmod +x install.sh uninstall.sh scripts/*.sh</code></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Run the installer as root</strong><br /><code>sudo ./install.sh</code> — auto-detects interface &amp; public IP</div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Add your first client</strong><br /><code>sudo ./scripts/add-client.sh alice</code></div></div>
+  <div class="step"><div class="step-num">5</div><div class="step-body"><strong>Scan QR code on mobile</strong><br /><code>sudo ./scripts/show-qr.sh alice</code></div></div>
+  <div class="step"><div class="step-num">6</div><div class="step-body"><strong>Verify</strong><br /><code>sudo wg show</code> — check handshake + transfer</div></div>
+
+  
+  <h2>What install.sh Does (Step by Step)</h2>
+  <table>
+    <tr><th>Step</th><th>Action</th><th>Why</th></tr>
+    <tr><td>1</td><td>Pre-flight checks</td><td>Root, Ubuntu 24.04, detect interface &amp; public IP</td></tr>
+    <tr><td>2</td><td><code>apt install wireguard qrencode fail2ban ufw …</code></td><td>All required packages</td></tr>
+    <tr><td>3</td><td>Write <code>/etc/sysctl.d/99-wireguard.conf</code></td><td>Enable IPv4/IPv6 forwarding, TCP hardening</td></tr>
+    <tr><td>4</td><td><code>wg genkey | wg pubkey</code></td><td>Generate Curve25519 server keypair</td></tr>
+    <tr><td>5</td><td>Create <code>/etc/wireguard/wg0.conf</code></td><td>Server config with NAT PostUp/PostDown rules</td></tr>
+    <tr><td>6</td><td>Init IP counter + client registry</td><td>Track next available IP, client metadata</td></tr>
+    <tr><td>7</td><td>Configure UFW</td><td>Allow SSH, 51820/UDP; set FORWARD=ACCEPT</td></tr>
+    <tr><td>8</td><td>Configure Fail2Ban</td><td>SSH protection, aggressive mode, recidive</td></tr>
+    <tr><td>9</td><td>Enable unattended-upgrades</td><td>Auto security patches, reboot at 3am</td></tr>
+    <tr><td>10</td><td><code>systemctl enable wg-quick@wg0</code></td><td>Auto-start on boot</td></tr>
+    <tr><td>11</td><td>Save <code>/etc/wireguard/server.env</code></td><td>Shared config sourced by all scripts</td></tr>
+  </table>
+
+  
+  <h2>Management Commands</h2>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Add Client</div>
+      <pre><code>sudo ./scripts/add-client.sh alice</code></pre>
+      <p style="font-size:12px;color:#57606a">Generates keys, assigns IP (.2, .3 …), creates .conf, generates QR PNG, hot-adds peer, updates registry</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Show QR Code</div>
+      <pre><code>sudo ./scripts/show-qr.sh alice</code></pre>
+      <p style="font-size:12px;color:#57606a">Renders QR in terminal (UTF-8) for mobile scanning. PNG also saved to client directory</p>
+    </div>
+    <div class="card">
+      <div class="card-title">List Clients</div>
+      <pre><code>sudo ./scripts/list-clients.sh</code></pre>
+      <p style="font-size:12px;color:#57606a">Shows name, IP, live connection status, last handshake, RX/TX bytes</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Revoke Client</div>
+      <pre><code>sudo ./scripts/revoke-client.sh alice</code></pre>
+      <p style="font-size:12px;color:#57606a">Blocks immediately (hot-remove + comment wg0.conf). Keys preserved for audit trail</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Remove Client</div>
+      <pre><code>sudo ./scripts/remove-client.sh alice</code></pre>
+      <p style="font-size:12px;color:#57606a">Hot-removes peer, shreds keys with <code>shred -u -z -n3</code>, removes from registry</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Live Monitor</div>
+      <pre><code>sudo ./scripts/monitor.sh</code></pre>
+      <p style="font-size:12px;color:#57606a">Dashboard: peers, handshake age, RX/TX, CPU/RAM, last log entries. Refreshes every 5s</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Backup</div>
+      <pre><code>sudo ./scripts/backup.sh
+# Optional AES-256 encryption prompted</code></pre>
+      <p style="font-size:12px;color:#57606a">Archives /etc/wireguard, creates SHA256 checksum, optionally encrypts with openssl PBKDF2</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Update</div>
+      <pre><code>sudo ./scripts/update-wg.sh</code></pre>
+      <p style="font-size:12px;color:#57606a">Backs up first, apt upgrade, restarts WireGuard, verifies it restarted cleanly</p>
+    </div>
+  </div>
+
+  
+  <h2>Cryptography</h2>
+  <div class="grid3">
+    <div class="crypto-box">
+      <div class="crypto-hdr">Key Exchange</div>
+      <div class="crypto-body"><strong>Curve25519</strong><br />256-bit elliptic-curve Diffie-Hellman. Modern, patent-free. Private key is 32 random bytes; public key derived via <code>wg pubkey</code>.</div>
+    </div>
+    <div class="crypto-box">
+      <div class="crypto-hdr">Encryption</div>
+      <div class="crypto-body"><strong>ChaCha20-Poly1305</strong><br />Authenticated encryption. Faster than AES on devices without AES-NI hardware. Provides both confidentiality and integrity.</div>
+    </div>
+    <div class="crypto-box">
+      <div class="crypto-hdr">Hashing</div>
+      <div class="crypto-body"><strong>BLAKE2s</strong><br />Faster than SHA-256. Used in the Noise protocol handshake hash chain and key derivation.</div>
+    </div>
+  </div>
+  <div class="info"><strong>Preshared Key</strong> — Each client also gets a 256-bit symmetric preshared key (<code>wg genpsk</code>). This provides an additional layer of post-quantum resistance on top of the Curve25519 handshake.</div>
+
+  
+  <h2>Handshake Flow (Noise_IKpsk2)</h2>
+  <div class="flow">
+    <div class="flow-box" style="background:#dbeafe">Client<br /><small>private key<br />ephemeral key</small></div>
+    <div class="flow-arr">──<br />Initiation<br />──▶</div>
+    <div class="flow-box" style="background:#f7f8fa">Network<br />(UDP)</div>
+    <div class="flow-arr">──<br />──▶</div>
+    <div class="flow-box" style="background:#dcfce7">Server<br /><small>verifies<br />timestamp</small></div>
+    <div class="flow-arr">◀──<br />Response<br />──</div>
+    <div class="flow-box" style="background:#f7f8fa">Network<br />(UDP)</div>
+    <div class="flow-arr">◀──<br />──</div>
+    <div class="flow-box" style="background:#dbeafe">Client<br /><small>derives<br />session keys</small></div>
+  </div>
+  <p style="font-size:13px;color:#57606a">After 2 messages both sides independently derive identical <strong>transport keys</strong> (ChaCha20). Keys rotate every 3 minutes or 2⁶⁴ packets via a new handshake. Ephemeral keys provide <strong>forward secrecy</strong>.</p>
+
+  
+  <h2>Full Tunnel Packet Flow</h2>
+  <div class="flow" style="flex-direction:column;align-items:flex-start;gap:4px">
+    <div style="font-size:12px;display:flex;align-items:center;gap:8px"><span style="background:#ede9fe;padding:3px 8px;border-radius:4px;font-weight:700">Client app</span> → sends packet to 8.8.8.8</div>
+    <div style="padding-left:16px;color:#57606a;font-size:12px">↓ AllowedIPs = 0.0.0.0/0 → route via wg0</div>
+    <div style="font-size:12px;display:flex;align-items:center;gap:8px"><span style="background:#dbeafe;padding:3px 8px;border-radius:4px;font-weight:700">WireGuard (client)</span> → encrypts with ChaCha20-Poly1305 + counter nonce</div>
+    <div style="padding-left:16px;color:#57606a;font-size:12px">↓ UDP to server:51820</div>
+    <div style="font-size:12px;display:flex;align-items:center;gap:8px"><span style="background:#dcfce7;padding:3px 8px;border-radius:4px;font-weight:700">WireGuard (server)</span> → decrypts, validates counter &amp; AllowedIPs</div>
+    <div style="padding-left:16px;color:#57606a;font-size:12px">↓ iptables NAT MASQUERADE rewrites source 10.100.0.2 → server public IP</div>
+    <div style="font-size:12px;display:flex;align-items:center;gap:8px"><span style="background:#fef3c7;padding:3px 8px;border-radius:4px;font-weight:700">Internet</span> → sees request from server's public IP, replies to server</div>
+    <div style="padding-left:16px;color:#57606a;font-size:12px">↓ NAT table reverses: server IP → 10.100.0.2 → re-encrypt → send to client</div>
+  </div>
+
+  
+  <h2>Security Features</h2>
+  <div class="grid2">
+    <div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Curve25519 + ChaCha20-Poly1305 + BLAKE2s</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Preshared key (quantum resistance)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Forward secrecy (ephemeral keys per session)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Replay attack prevention (monotonic counter)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Identity hiding (responder identity encrypted)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Key-only auth (no passwords)</div>
+    </div>
+    <div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Kill switch (iptables OUTPUT REJECT)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> DNS leak prevention (VPN DNS enforced)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> UFW firewall (default deny, explicit allow)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Fail2Ban (SSH + recidive)</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> chmod 600 on all key files</div>
+      <div class="sec-check"><span class="sec-icon">✔</span> Automatic security updates</div>
+    </div>
+  </div>
+
+  
+  <h2>Key Configuration Files Explained</h2>
+  <table>
+    <tr><th>File</th><th>Location on server</th><th>Contains</th><th>Permissions</th></tr>
+    <tr><td><code>wg0.conf</code></td><td><code>/etc/wireguard/wg0.conf</code></td><td>Server private key, IP, port, NAT rules, all [Peer] blocks</td><td><strong>600</strong> root only</td></tr>
+    <tr><td><code>server.env</code></td><td><code>/etc/wireguard/server.env</code></td><td>Public IP, interface, port, paths — sourced by scripts</td><td>600</td></tr>
+    <tr><td><code>server_private.key</code></td><td><code>/etc/wireguard/</code></td><td>Server Curve25519 private key</td><td>600</td></tr>
+    <tr><td><code>alice.conf</code></td><td><code>/etc/wireguard/clients/alice/</code></td><td>Client private key, server public key, PSK, endpoint</td><td>600</td></tr>
+    <tr><td><code>alice-qr.png</code></td><td><code>/etc/wireguard/clients/alice/</code></td><td>QR code image of alice.conf</td><td>600</td></tr>
+    <tr><td><code>.client_registry</code></td><td><code>/etc/wireguard/</code></td><td>Tab-separated: name, IP, created date, status</td><td>600</td></tr>
+    <tr><td><code>.ip_counter</code></td><td><code>/etc/wireguard/</code></td><td>Integer: next available last octet (starts at 2)</td><td>600</td></tr>
+  </table>
+
+  
+  <h2>wg0.conf Breakdown</h2>
+  <pre><code>[Interface]
+PrivateKey = &lt;server private key&gt;     # Curve25519 — 32 bytes, Base64
+Address    = 10.100.0.1/24            # Server VPN IP (also owns the subnet)
+Address    = fd00:100::1/64           # IPv6 equivalent
+ListenPort = 51820                    # UDP port
+MTU        = 1420                     # 1500 - 80 bytes WG overhead
+
+# NAT — applied when interface comes UP
+PostUp  = iptables -t nat -A POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
+PostUp  = iptables -A FORWARD -i %i -j ACCEPT   # Allow VPN→internet
+PostUp  = iptables -A FORWARD -o %i -j ACCEPT   # Allow internet→VPN
+
+# Cleanup — applied when interface goes DOWN (mirror PostUp with -D)
+PostDown = iptables -t nat -D POSTROUTING ...
+
+# Added automatically by add-client.sh:
+[Peer]
+# Name: alice
+PublicKey    = &lt;client public key&gt;
+PresharedKey = &lt;shared symmetric key&gt;
+AllowedIPs   = 10.100.0.2/32, fd00:100::2/128</code></pre>
+
+  
+  <h2>Connect From Every Platform</h2>
+  <div class="platform-grid">
+    <div class="platform-card">
+      <span class="platform-icon">🪟</span>
+      <div class="platform-name">Windows</div>
+      <div class="platform-cmd">wireguard.com/install<br />Import .conf file</div>
+    </div>
+    <div class="platform-card">
+      <span class="platform-icon">🐧</span>
+      <div class="platform-name">Linux</div>
+      <div class="platform-cmd"><code>apt install wireguard</code><br /><code>wg-quick up wg0</code></div>
+    </div>
+    <div class="platform-card">
+      <span class="platform-icon">🍎</span>
+      <div class="platform-name">macOS</div>
+      <div class="platform-cmd">App Store:<br />WireGuard app</div>
+    </div>
+    <div class="platform-card">
+      <span class="platform-icon">🤖</span>
+      <div class="platform-name">Android</div>
+      <div class="platform-cmd">Google Play<br />Scan QR code</div>
+    </div>
+    <div class="platform-card">
+      <span class="platform-icon">📱</span>
+      <div class="platform-name">iOS</div>
+      <div class="platform-cmd">App Store<br />Scan QR code</div>
+    </div>
+  </div>
+  <div class="ok"><strong>QR Code flow:</strong> <code>sudo ./scripts/add-client.sh alice</code> → <code>sudo ./scripts/show-qr.sh alice</code> → scan with WireGuard mobile app → toggle to connect</div>
+
+  
+  <h2>Deployment Options</h2>
+  <div class="deploy-grid">
+    <div class="deploy-card">
+      <div class="name">🟧 AWS EC2</div>
+      <div class="cost">~$8/month (t3.micro)</div>
+      <div class="specs">Security Group: UDP 51820<br />Elastic IP for static address<br />SSH key pair required</div>
+    </div>
+    <div class="deploy-card">
+      <div class="name">🔷 Azure VM</div>
+      <div class="cost">~$8/month (B1s)</div>
+      <div class="specs">NSG inbound rule: UDP 51820<br />Static public IP (change from Dynamic)<br />SSH public key auth</div>
+    </div>
+    <div class="deploy-card">
+      <div class="name">🟦 DigitalOcean</div>
+      <div class="cost">$6/month (Basic)</div>
+      <div class="specs">Static IP by default<br />Firewall: UDP 51820<br />Simplest setup</div>
+    </div>
+    <div class="deploy-card">
+      <div class="name">🟡 Oracle Cloud</div>
+      <div class="cost"><strong>FREE forever</strong></div>
+      <div class="specs">ARM: 4 OCPU, 24GB RAM<br />Security List: UDP 51820<br />Must disable default iptables REJECT</div>
+    </div>
+    <div class="deploy-card">
+      <div class="name">🫐 Raspberry Pi</div>
+      <div class="cost">One-time hardware</div>
+      <div class="specs">Router port forward: 51820/UDP<br />Static LAN IP via DHCP/netplan<br />DuckDNS for dynamic public IP</div>
+    </div>
+    <div class="deploy-card">
+      <div class="name">🏠 Home PC</div>
+      <div class="cost">No extra cost</div>
+      <div class="specs">PC must stay on<br />Router port forward: 51820/UDP<br />Bridged VM or bare metal</div>
+    </div>
+  </div>
+
+  
+  <h2>Kernel Settings Applied</h2>
+  <table>
+    <tr><th>Setting</th><th>Value</th><th>Purpose</th></tr>
+    <tr><td><code>net.ipv4.ip_forward</code></td><td>1</td><td>Route packets between interfaces (essential for VPN)</td></tr>
+    <tr><td><code>net.ipv6.conf.all.forwarding</code></td><td>1</td><td>Same for IPv6</td></tr>
+    <tr><td><code>net.ipv4.conf.all.rp_filter</code></td><td>2 (loose)</td><td>Strict mode breaks WireGuard asymmetric routing</td></tr>
+    <tr><td><code>net.ipv4.tcp_syncookies</code></td><td>1</td><td>Prevent SYN flood attacks</td></tr>
+    <tr><td><code>net.ipv4.conf.all.accept_redirects</code></td><td>0</td><td>Block ICMP redirect (MITM prevention)</td></tr>
+    <tr><td><code>net.ipv4.conf.all.send_redirects</code></td><td>0</td><td>Don't send ICMP redirects</td></tr>
+    <tr><td><code>net.ipv4.conf.all.log_martians</code></td><td>1</td><td>Log impossible-source packets</td></tr>
+  </table>
+
+  
+  <h2>Troubleshooting Quick Reference</h2>
+  <table>
+    <tr><th>Symptom</th><th>Most Likely Cause</th><th>Quick Fix</th></tr>
+    <tr><td>Can't connect</td><td>Port blocked by firewall</td><td><code>sudo ufw allow 51820/udp</code></td></tr>
+    <tr><td>Connected, no internet</td><td>IP forwarding off or NAT missing</td><td><code>sysctl net.ipv4.ip_forward</code> → must be 1</td></tr>
+    <tr><td>Wrong interface in NAT</td><td>PostUp uses wrong iface name</td><td>Check <code>ip route get 1.1.1.1</code>, update wg0.conf</td></tr>
+    <tr><td>Disconnects often</td><td>NAT table timeout</td><td>Add <code>PersistentKeepalive = 25</code> to client config</td></tr>
+    <tr><td>DNS leaks</td><td>System DNS bypasses VPN</td><td>Verify <code>DNS = 1.1.1.1,8.8.8.8</code> in client config</td></tr>
+    <tr><td>Slow speeds</td><td>MTU fragmentation</td><td>Lower MTU to 1280 in client + server</td></tr>
+    <tr><td>Handshake never succeeds</td><td>Server clock skew</td><td><code>sudo timedatectl set-ntp true</code></td></tr>
+    <tr><td>Permission denied on wg0.conf</td><td>Wrong file permissions</td><td><code>sudo chmod 600 /etc/wireguard/wg0.conf</code></td></tr>
+  </table>
+
+  
+  <h2>Essential Commands Cheat Sheet</h2>
+  <pre><code># ── Service management ──────────────────────────────────────────────────
+sudo systemctl status wg-quick@wg0      # Is VPN running?
+sudo systemctl restart wg-quick@wg0     # Restart (reloads config)
+sudo systemctl stop wg-quick@wg0        # Stop VPN
+sudo systemctl start wg-quick@wg0       # Start VPN
+sudo journalctl -u wg-quick@wg0 -f      # Follow live logs
+
+# ── WireGuard status ─────────────────────────────────────────────────────
+sudo wg show                            # All peers + stats
+sudo wg show wg0 latest-handshakes      # When each peer last connected
+sudo wg show wg0 transfer               # Bytes per peer
+
+# ── Firewall ─────────────────────────────────────────────────────────────
+sudo ufw status verbose                 # Show all rules
+sudo iptables -t nat -L -n -v           # Check NAT/masquerade rules
+
+# ── Diagnostics ──────────────────────────────────────────────────────────
+curl https://api.ipify.org              # Your current public IP
+ping 10.100.0.1                         # Ping VPN server from client
+ip route show                           # Routing table
+cat /etc/resolv.conf                    # Active DNS servers</code></pre>
+
+  <div class="warn"><strong>Security reminder:</strong> After distributing a client config, delete it from the server: <code>sudo shred -u -z /etc/wireguard/clients/alice/alice.conf</code>. The client should be the only holder of their private key.</div>
+
+  <footer>Made with IBM Bob</footer>
+</div>
+</body>
+</html>

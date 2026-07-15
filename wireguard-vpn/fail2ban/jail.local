@@ -1,0 +1,82 @@
+# =============================================================================
+# Fail2Ban jail.local — WireGuard VPN Server
+# =============================================================================
+# Location: /etc/fail2ban/jail.local
+# This file overrides settings in /etc/fail2ban/jail.conf
+#
+# HOW FAIL2BAN WORKS:
+#   1. Monitors log files (or systemd journal)
+#   2. Counts failed login attempts per IP
+#   3. When an IP exceeds maxretry within findtime, it gets BANNED
+#   4. Ban = iptables DROP rule for that IP
+#   5. After bantime seconds, the ban is automatically lifted
+# =============================================================================
+
+[DEFAULT]
+# ── Global settings ───────────────────────────────────────────────────────────
+
+# How long to ban (seconds)
+# 3600 = 1 hour  |  86400 = 1 day  |  604800 = 1 week
+bantime  = 3600
+
+# Time window for counting failures (600 = 10 minutes)
+# An IP must fail maxretry times WITHIN this window to be banned
+findtime  = 600
+
+# Number of failures before ban
+maxretry = 5
+
+# Use systemd journal backend (better than file-based on Ubuntu 24.04)
+backend = systemd
+
+# Don't ban these IPs (whitelist: your admin IP, etc.)
+# ignoreip = 127.0.0.1/8 ::1 YOUR.ADMIN.IP.HERE
+
+# Action: what to do when banning
+# %(action_)s = just ban (iptables only)
+# %(action_mw)s = ban + send email (requires mail config)
+# %(action_mwl)s = ban + email with log lines
+action = %(action_)s
+
+# ── SSH Protection ─────────────────────────────────────────────────────────────
+[sshd]
+# Enable this jail
+enabled  = true
+
+# Port(s) to apply the ban to
+port     = ssh
+
+# Filter file: defines the regex patterns to match in logs
+# Found at: /etc/fail2ban/filter.d/sshd.conf
+filter   = sshd
+
+# Log file to monitor (Ubuntu uses systemd journal, but this is fallback)
+logpath  = %(sshd_log)s
+
+# 3 failed attempts = 1 hour ban
+maxretry = 3
+bantime  = 3600
+
+# ── Aggressive SSH Protection ──────────────────────────────────────────────────
+# Uses a stricter filter that catches more attack patterns
+[sshd-ddos]
+enabled  = true
+port     = ssh
+filter   = sshd[mode=aggressive]
+logpath  = %(sshd_log)s
+
+# Only 2 attempts = 24 hour ban (for more aggressive scanning)
+maxretry = 2
+bantime  = 86400
+findtime = 3600
+
+# ── Repeated offenders ────────────────────────────────────────────────────────
+# Ban IPs that keep coming back even after ban expires
+[recidive]
+enabled   = true
+filter    = recidive
+logpath   = /var/log/fail2ban.log
+action    = %(action_)s
+bantime   = 604800   # 1 week for repeat offenders
+findtime  = 86400    # Check last 24 hours
+maxretry  = 3        # 3 strikes in 24h = 1 week ban
